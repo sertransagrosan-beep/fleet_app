@@ -1,0 +1,19 @@
+fleet_app/
+│
+├── app.py
+│
+├── database/
+│   ├── db.py
+│   └── models.py
+│
+├── modules/
+│   ├── vehicles.py
+│   ├── trailers.py
+│   ├── drivers.py
+│   └── maintenance.py
+│
+├── data/
+│
+└── requirements.txt
+
+streamlit run app.py
