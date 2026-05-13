@@ -1,4 +1,4 @@
-# modules/import_data.py (agregar función para leer asignaciones)
+# modules/import_data.py
 
 import streamlit as st
 import pandas as pd
@@ -65,12 +65,12 @@ def importar_vehiculos_desde_excel(df_raw):
         
         vehicle_data = {
             "placa": placa.upper(),
-            "marca": limpiar_texto(df_raw.iloc[ROW_MARCA, col_idx]),
-            "linea": limpiar_texto(df_raw.iloc[ROW_LINEA, col_idx]),
-            "modelo": limpiar_texto(df_raw.iloc[ROW_MODELO, col_idx]),
-            "color": limpiar_texto(df_raw.iloc[ROW_COLOR, col_idx]),
-            "soat": limpiar_fecha(df_raw.iloc[ROW_SOAT, col_idx]),
-            "tecnomecanica": limpiar_fecha(df_raw.iloc[ROW_TECNOMECANICA, col_idx]),
+            "marca": limpiar_texto(df_raw.iloc[ROW_MARCA, col_idx]) if ROW_MARCA < df_raw.shape[0] else "",
+            "linea": limpiar_texto(df_raw.iloc[ROW_LINEA, col_idx]) if ROW_LINEA < df_raw.shape[0] else "",
+            "modelo": limpiar_texto(df_raw.iloc[ROW_MODELO, col_idx]) if ROW_MODELO < df_raw.shape[0] else "",
+            "color": limpiar_texto(df_raw.iloc[ROW_COLOR, col_idx]) if ROW_COLOR < df_raw.shape[0] else "",
+            "soat": limpiar_fecha(df_raw.iloc[ROW_SOAT, col_idx]) if ROW_SOAT < df_raw.shape[0] else None,
+            "tecnomecanica": limpiar_fecha(df_raw.iloc[ROW_TECNOMECANICA, col_idx]) if ROW_TECNOMECANICA < df_raw.shape[0] else None,
             "kilometraje_actual": 0,
             "trailer_habitual_placa": "",
             "conductor_habitual_nombre": ""
@@ -112,9 +112,9 @@ def importar_trailers_desde_excel(df_raw):
         
         trailer_data = {
             "placa": placa.upper(),
-            "marca": limpiar_texto(df_raw.iloc[trailer_start_row + 1, col_idx] if trailer_start_row + 1 < df_raw.shape[0] else ""),
-            "modelo": limpiar_texto(df_raw.iloc[trailer_start_row + 2, col_idx] if trailer_start_row + 2 < df_raw.shape[0] else ""),
-            "carroceria": limpiar_texto(df_raw.iloc[trailer_start_row + 3, col_idx] if trailer_start_row + 3 < df_raw.shape[0] else "PLATAFORMA ESTACAS DESMONTABLES"),
+            "marca": limpiar_texto(df_raw.iloc[trailer_start_row + 1, col_idx]) if trailer_start_row + 1 < df_raw.shape[0] else "",
+            "modelo": limpiar_texto(df_raw.iloc[trailer_start_row + 2, col_idx]) if trailer_start_row + 2 < df_raw.shape[0] else "",
+            "carroceria": limpiar_texto(df_raw.iloc[trailer_start_row + 3, col_idx]) if trailer_start_row + 3 < df_raw.shape[0] else "PLATAFORMA ESTACAS DESMONTABLES",
             "numero_ejes": 3
         }
         
@@ -129,35 +129,70 @@ def importar_trailers_desde_excel(df_raw):
 
 
 def importar_conductores_desde_excel(df_raw):
-    """Extrae conductores del Excel"""
+    """
+    Extrae conductores del Excel incluyendo:
+    - Nombre (fila CONDUCTOR)
+    - Identificación (fila IDENTIFICACION)
+    - Celular (fila CELULAR)
+    - Licencia Conducción (fila LICENCIA CONDUCCION)
+    """
     drivers = []
     
+    # Buscar la fila donde comienza la sección de conductores
     driver_start_row = None
     for row_idx in range(df_raw.shape[0]):
         cell_value = limpiar_texto(df_raw.iloc[row_idx, 0])
-        if "CONDUCTOR" in cell_value.upper():
+        if cell_value.upper() == "CONDUCTOR":
             driver_start_row = row_idx
             break
+    
+    if driver_start_row is None:
+        # Intentar búsqueda más amplia
+        for row_idx in range(df_raw.shape[0]):
+            cell_value = limpiar_texto(df_raw.iloc[row_idx, 0])
+            if "CONDUCTOR" in cell_value.upper():
+                driver_start_row = row_idx
+                break
     
     if driver_start_row is None:
         st.warning("No se encontró la sección de conductores en el archivo")
         return pd.DataFrame()
     
+    nombre_row = driver_start_row
+    identificacion_row = driver_start_row + 1
+    celular_row = driver_start_row + 2
+    licencia_row = driver_start_row + 3
+    
     for col_idx in range(1, df_raw.shape[1]):
-        nombre = limpiar_texto(df_raw.iloc[driver_start_row, col_idx])
+        nombre = limpiar_texto(df_raw.iloc[nombre_row, col_idx]) if nombre_row < df_raw.shape[0] else ""
         
         if not nombre:
             continue
         
         identificacion = ""
-        if driver_start_row + 1 < df_raw.shape[0]:
-            identificacion = limpiar_texto(df_raw.iloc[driver_start_row + 1, col_idx])
+        if identificacion_row < df_raw.shape[0]:
+            identificacion = limpiar_texto(df_raw.iloc[identificacion_row, col_idx])
+        
+        # Leer celular
+        celular = ""
+        if celular_row < df_raw.shape[0]:
+            celular = limpiar_texto(df_raw.iloc[celular_row, col_idx])
+        
+        # Leer fecha de vencimiento de licencia - manejar NaN correctamente
+        vencimiento_licencia = None
+        if licencia_row < df_raw.shape[0]:
+            fecha_valor = df_raw.iloc[licencia_row, col_idx]
+            # Verificar si es un valor válido (no NaN)
+            if pd.notna(fecha_valor):
+                vencimiento_licencia = limpiar_fecha(fecha_valor)
+            # Si es NaN, dejar como None
         
         driver_data = {
             "nombre": nombre.upper(),
             "identificacion": identificacion,
-            "telefono": "",
-            "vencimiento_licencia": None
+            "telefono": celular,
+            "vencimiento_licencia": vencimiento_licencia,
+            "estado": "Activo"
         }
         
         drivers.append(driver_data)
@@ -176,6 +211,11 @@ def import_page():
     if archivo is not None:
         df_raw = pd.read_excel(archivo, header=None)
         
+        # Mostrar estructura del Excel para debug (opcional)
+        with st.expander("Ver estructura del Excel"):
+            st.write(f"Dimensiones: {df_raw.shape[0]} filas x {df_raw.shape[1]} columnas")
+            st.dataframe(df_raw.iloc[:25, :10], width="stretch")
+        
         tipo = st.selectbox(
             "Tipo de importación",
             ["Vehículos", "Trailers", "Conductores"]
@@ -193,92 +233,105 @@ def import_page():
             return
         
         st.subheader("Vista previa")
-        st.dataframe(df.astype(str), width="stretch")
+        st.dataframe(df.astype(str), width="stretch", hide_index=True)
         st.write(f"**Registros detectados:** {len(df)}")
         
-        if st.button("🚀 Importar Datos"):
+        if st.button("🚀 Importar Datos", use_container_width=True):
             db = SessionLocal()
             registros = 0
             omitidos = 0
+            errores = []
             
             try:
                 if tipo == "Vehículos":
-                    # Primero importamos todos los trailers y conductores si no existen
                     for _, row in df.iterrows():
-                        # Buscar o crear trailer habitual
-                        trailer_habitual_id = None
-                        if row.get("trailer_habitual_placa"):
-                            trailer = db.query(Trailer).filter(Trailer.placa == row["trailer_habitual_placa"]).first()
-                            if trailer:
-                                trailer_habitual_id = trailer.id
-                        
-                        # Buscar o crear conductor habitual
-                        conductor_habitual_id = None
-                        if row.get("conductor_habitual_nombre"):
-                            # Buscar por nombre (aproximado)
-                            conductor = db.query(Driver).filter(Driver.nombre.like(f"%{row['conductor_habitual_nombre']}%")).first()
-                            if conductor:
-                                conductor_habitual_id = conductor.id
-                        
-                        existe = db.query(Vehicle).filter(Vehicle.placa == row["placa"]).first()
-                        if existe:
-                            omitidos += 1
-                            continue
-                        
-                        nuevo = Vehicle(
-                            placa=row["placa"],
-                            marca=row["marca"],
-                            linea=row["linea"],
-                            modelo=str(row["modelo"]),
-                            color=row["color"],
-                            soat=row["soat"] if pd.notna(row["soat"]) else None,
-                            tecnomecanica=row["tecnomecanica"] if pd.notna(row["tecnomecanica"]) else None,
-                            kilometraje_actual=0,
-                            estado="Activo",
-                            trailer_habitual_id=trailer_habitual_id,
-                            conductor_habitual_id=conductor_habitual_id
-                        )
-                        db.add(nuevo)
-                        registros += 1
+                        try:
+                            existe = db.query(Vehicle).filter(Vehicle.placa == row["placa"]).first()
+                            if existe:
+                                omitidos += 1
+                                continue
+                            
+                            # Buscar trailer habitual por placa
+                            trailer_habitual_id = None
+                            if row.get("trailer_habitual_placa"):
+                                trailer = db.query(Trailer).filter(Trailer.placa == row["trailer_habitual_placa"]).first()
+                                if trailer:
+                                    trailer_habitual_id = trailer.id
+                            
+                            # Buscar conductor habitual por nombre
+                            conductor_habitual_id = None
+                            if row.get("conductor_habitual_nombre"):
+                                conductor = db.query(Driver).filter(Driver.nombre.like(f"%{row['conductor_habitual_nombre']}%")).first()
+                                if conductor:
+                                    conductor_habitual_id = conductor.id
+                            
+                            nuevo = Vehicle(
+                                placa=row["placa"],
+                                marca=row["marca"],
+                                linea=row["linea"],
+                                modelo=str(row["modelo"]),
+                                color=row["color"],
+                                soat=row["soat"] if pd.notna(row["soat"]) else None,
+                                tecnomecanica=row["tecnomecanica"] if pd.notna(row["tecnomecanica"]) else None,
+                                kilometraje_actual=0,
+                                estado="Activo",
+                                trailer_habitual_id=trailer_habitual_id,
+                                conductor_habitual_id=conductor_habitual_id
+                            )
+                            db.add(nuevo)
+                            registros += 1
+                        except Exception as e:
+                            errores.append(f"{row['placa']}: {str(e)}")
                 
                 elif tipo == "Trailers":
                     for _, row in df.iterrows():
-                        existe = db.query(Trailer).filter(Trailer.placa == row["placa"]).first()
-                        if existe:
-                            omitidos += 1
-                            continue
-                        
-                        nuevo = Trailer(
-                            placa=row["placa"],
-                            marca=row["marca"],
-                            modelo=str(row["modelo"]),
-                            carroceria=row["carroceria"],
-                            numero_ejes=row["numero_ejes"],
-                            estado="Activo"
-                        )
-                        db.add(nuevo)
-                        registros += 1
+                        try:
+                            existe = db.query(Trailer).filter(Trailer.placa == row["placa"]).first()
+                            if existe:
+                                omitidos += 1
+                                continue
+                            
+                            nuevo = Trailer(
+                                placa=row["placa"],
+                                marca=row["marca"],
+                                modelo=str(row["modelo"]),
+                                carroceria=row["carroceria"],
+                                numero_ejes=row["numero_ejes"],
+                                estado="Activo"
+                            )
+                            db.add(nuevo)
+                            registros += 1
+                        except Exception as e:
+                            errores.append(f"{row['placa']}: {str(e)}")
                 
                 else:  # Conductores
                     for _, row in df.iterrows():
-                        if not row["identificacion"]:
-                            omitidos += 1
-                            continue
-                        
-                        existe = db.query(Driver).filter(Driver.identificacion == row["identificacion"]).first()
-                        if existe:
-                            omitidos += 1
-                            continue
-                        
-                        nuevo = Driver(
-                            nombre=row["nombre"],
-                            identificacion=row["identificacion"],
-                            telefono="",
-                            vencimiento_licencia=None,
-                            estado="Activo"
-                        )
-                        db.add(nuevo)
-                        registros += 1
+                        try:
+                            if not row["identificacion"]:
+                                omitidos += 1
+                                continue
+                            
+                            existe = db.query(Driver).filter(Driver.identificacion == row["identificacion"]).first()
+                            if existe:
+                                omitidos += 1
+                                continue
+                            
+                            # Manejar vencimiento_licencia - convertir NaN a None
+                            vencimiento = row.get("vencimiento_licencia", None)
+                            if pd.isna(vencimiento):
+                                vencimiento = None
+                            
+                            nuevo = Driver(
+                                nombre=row["nombre"],
+                                identificacion=row["identificacion"],
+                                telefono=row.get("telefono", ""),
+                                vencimiento_licencia=vencimiento,
+                                estado="Activo"
+                            )
+                            db.add(nuevo)
+                            registros += 1
+                        except Exception as e:
+                            errores.append(f"{row['nombre']}: {str(e)}")
                 
                 db.commit()
                 
@@ -286,9 +339,13 @@ def import_page():
                     st.success(f"✅ {registros} registros importados correctamente")
                 if omitidos > 0:
                     st.info(f"ℹ️ {omitidos} registros omitidos (ya existían)")
+                if errores:
+                    st.warning(f"⚠️ {len(errores)} errores:")
+                    for err in errores[:5]:
+                        st.write(f"- {err}")
                 
             except Exception as e:
                 db.rollback()
-                st.error(f"❌ Error: {e}")
+                st.error(f"❌ Error general: {e}")
             finally:
                 db.close()

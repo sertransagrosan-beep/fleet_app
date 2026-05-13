@@ -9,17 +9,17 @@ class Vehicle(Base):
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True)
-    placa = Column(String, unique=True, nullable=False)
-    marca = Column(String)
-    linea = Column(String)
-    modelo = Column(String)
-    color = Column(String)
-    capacidad_carga = Column(String)
-    tipo_combustible = Column(String)
+    placa = Column(String(20), unique=True, nullable=False)
+    marca = Column(String(100))
+    linea = Column(String(100))
+    modelo = Column(String(10))
+    color = Column(String(100))
+    capacidad_carga = Column(String(50))
+    tipo_combustible = Column(String(50))
     soat = Column(Date)
     tecnomecanica = Column(Date)
     kilometraje_actual = Column(Integer)
-    estado = Column(String)
+    estado = Column(String(20))
     
     # Trailer y conductor habitual
     trailer_habitual_id = Column(Integer, ForeignKey("trailers.id"), nullable=True)
@@ -35,12 +35,12 @@ class Trailer(Base):
     __tablename__ = "trailers"
 
     id = Column(Integer, primary_key=True)
-    placa = Column(String, unique=True, nullable=False)
-    marca = Column(String)
-    modelo = Column(String)
-    carroceria = Column(String)
+    placa = Column(String(20), unique=True, nullable=False)
+    marca = Column(String(100))
+    modelo = Column(String(10))
+    carroceria = Column(String(100))
     numero_ejes = Column(Integer)
-    estado = Column(String)
+    estado = Column(String(20))
 
     maintenances = relationship("Maintenance", back_populates="trailer")
     # Relación inversa: trailers asignados como habituales
@@ -51,11 +51,11 @@ class Driver(Base):
     __tablename__ = "drivers"
 
     id = Column(Integer, primary_key=True)
-    nombre = Column(String, nullable=False)
-    identificacion = Column(String, unique=True)
-    telefono = Column(String)
+    nombre = Column(String(200), nullable=False)
+    identificacion = Column(String(50), unique=True)
+    telefono = Column(String(20))
     vencimiento_licencia = Column(Date)
-    estado = Column(String)
+    estado = Column(String(20))
 
     maintenances = relationship("Maintenance", back_populates="driver")
     # Relación inversa: conductores asignados como habituales
@@ -72,11 +72,11 @@ class Maintenance(Base):
     trailer_id = Column(Integer, ForeignKey("trailers.id"), nullable=True)
     conductor_id = Column(Integer, ForeignKey("drivers.id"), nullable=True)
     
-    tipo_mantenimiento = Column(String)
+    tipo_mantenimiento = Column(String(50))
     descripcion = Column(Text)
     observaciones = Column(Text)
-    taller = Column(String)
-    estado = Column(String)
+    taller = Column(String(200))
+    estado = Column(String(20))
 
     vehicle = relationship("Vehicle", back_populates="maintenances")
     trailer = relationship("Trailer", back_populates="maintenances")
