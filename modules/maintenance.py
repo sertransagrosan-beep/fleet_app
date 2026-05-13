@@ -14,14 +14,14 @@ def maintenance_page():
     db = SessionLocal()
     
     # Inicializar estado de sesión para limpiar formulario
-    if "form_submitted" not in st.session_state:
-        st.session_state.form_submitted = False
+    if "maintenance_form_submitted" not in st.session_state:
+        st.session_state.maintenance_form_submitted = False
     
     # Pestañas
     tab1, tab2, tab3, tab4 = st.tabs(["📝 Registrar", "📋 Listar", "🔍 Consultar", "✏️ Editar/Eliminar"])
     
     # ==================================================
-    # TAB 1: REGISTRAR MANTENIMIENTO
+    # TAB 1: REGISTRAR MANTENIMIENTO (con limpieza)
     # ==================================================
     with tab1:
         st.subheader("Registrar Mantenimiento")
@@ -36,10 +36,13 @@ def maintenance_page():
         
         vehicle_options = {v.id: f"{v.placa} - {v.marca} {v.linea}" for v in vehicles}
         
-        # Selector de vehículo
-        if "selected_vehicle_id" not in st.session_state or st.session_state.form_submitted:
+        # Resetear selección si se acaba de guardar
+        if st.session_state.maintenance_form_submitted:
             st.session_state.selected_vehicle_id = list(vehicle_options.keys())[0] if vehicle_options else None
-            st.session_state.form_submitted = False
+            st.session_state.maintenance_form_submitted = False
+        
+        if "selected_vehicle_id" not in st.session_state:
+            st.session_state.selected_vehicle_id = list(vehicle_options.keys())[0] if vehicle_options else None
         
         selected_vehicle_id = st.selectbox(
             "🚛 Seleccione Vehículo",
@@ -148,7 +151,7 @@ def maintenance_page():
                 if not selected_vehicle_id:
                     errores.append("El vehículo es obligatorio")
                 
-                # Verificar duplicado (mismo vehículo, misma fecha, mismo tipo)
+                # Verificar duplicado
                 duplicado = db.query(Maintenance).filter(
                     Maintenance.vehiculo_id == selected_vehicle_id,
                     Maintenance.fecha_ingreso == fecha_ingreso,
@@ -182,12 +185,12 @@ def maintenance_page():
                               f"**Fecha:** {fecha_ingreso}\n"
                               f"**Tipo:** {tipo_mantenimiento}")
                     
-                    # Marcar para limpiar el formulario en la próxima ejecución
-                    st.session_state.form_submitted = True
+                    # Marcar para limpiar el formulario y recargar
+                    st.session_state.maintenance_form_submitted = True
                     st.rerun()
     
     # ==================================================
-    # TAB 2: LISTAR MANTENIMIENTOS
+    # TAB 2: LISTAR MANTENIMIENTOS (con columna Descripción)
     # ==================================================
     with tab2:
         st.subheader("📋 Lista de Mantenimientos")
@@ -205,6 +208,7 @@ def maintenance_page():
                     "CONDUCTOR": m.driver.nombre if m.driver else "-",
                     "TIPO": m.tipo_mantenimiento,
                     "TALLER": m.taller if m.taller else "-",
+                    "DESCRIPCIÓN": (m.descripcion[:80] + "...") if m.descripcion and len(m.descripcion) > 80 else (m.descripcion if m.descripcion else "-"),
                     "ESTADO": m.estado
                 })
             
@@ -213,7 +217,7 @@ def maintenance_page():
             
             # Exportar lista completa
             if st.button("📎 Exportar lista completa a Excel", use_container_width=True):
-                # Exportar con datos completos
+                # Exportar con datos completos (descripción sin truncar)
                 data_full = []
                 for m in maintenances:
                     data_full.append({
@@ -235,7 +239,7 @@ def maintenance_page():
             st.info("ℹ️ No hay mantenimientos registrados")
     
     # ==================================================
-    # TAB 3: CONSULTAR MANTENIMIENTOS (CON FILTROS)
+    # TAB 3: CONSULTAR (con descripción en exportación)
     # ==================================================
     with tab3:
         st.subheader("🔍 Consulta de Mantenimientos")
@@ -294,40 +298,32 @@ def maintenance_page():
         col_f3, col_f4 = st.columns(2)
         
         with col_f3:
-            # Búsqueda inteligente por taller (texto libre)
             taller_search = st.text_input(
                 "🔍 Buscar taller (búsqueda inteligente)",
-                placeholder="Ej: Taller Central, Mecánico Pérez, etc.",
-                help="Busca cualquier parte del nombre del taller"
+                placeholder="Ej: Taller Central, Mecánico Pérez, etc."
             )
         
         with col_f4:
-            # Búsqueda inteligente por descripción (texto libre)
             descripcion_search = st.text_input(
                 "📝 Buscar en descripción (búsqueda inteligente)",
-                placeholder="Palabra clave en la descripción...",
-                help="Busca texto en la descripción del mantenimiento"
+                placeholder="Palabra clave en la descripción..."
             )
         
         # Tercera fila: Fechas
         col_f5, col_f6 = st.columns(2)
         
         with col_f5:
-            fecha_desde = st.date_input("📅 Fecha desde", value=None, help="Fecha inicial del rango")
+            fecha_desde = st.date_input("📅 Fecha desde", value=None)
         
         with col_f6:
-            fecha_hasta = st.date_input("📅 Fecha hasta", value=None, help="Fecha final del rango")
+            fecha_hasta = st.date_input("📅 Fecha hasta", value=None)
         
-        # Mostrar resumen de filtros activos
         st.markdown("---")
         
         # Construir consulta dinámica
         query = db.query(Maintenance)
-        
-        # Contador de filtros activos para mostrar resumen
         filtros_activos = []
         
-        # Aplicar filtros solo si están seleccionados
         if selected_vehicle_id:
             query = query.filter(Maintenance.vehiculo_id == selected_vehicle_id)
             filtros_activos.append(f"Vehículo: {selected_vehicle_display}")
@@ -360,19 +356,16 @@ def maintenance_page():
             query = query.filter(Maintenance.fecha_ingreso <= fecha_hasta)
             filtros_activos.append(f"Hasta: {fecha_hasta}")
         
-        # Mostrar resumen de filtros
         if filtros_activos:
             st.info(f"🔍 **Filtros aplicados ({len(filtros_activos)}):** " + " | ".join(filtros_activos))
         else:
             st.info("🔍 **Mostrando todos los mantenimientos** (sin filtros aplicados)")
         
-        # Ejecutar consulta
         maintenances_filtered = query.order_by(Maintenance.fecha_ingreso.desc()).all()
         
         if maintenances_filtered:
             st.success(f"📊 **{len(maintenances_filtered)}** mantenimiento(s) encontrado(s)")
             
-            # Preparar datos para mostrar
             data = []
             for m in maintenances_filtered:
                 data.append({
@@ -398,7 +391,6 @@ def maintenance_page():
             
             with col_exp1:
                 if st.button("📎 Exportar resultados actuales a Excel", use_container_width=True):
-                    # Exportar todos los datos completos (sin truncar descripción)
                     data_full = []
                     for m in maintenances_filtered:
                         data_full.append({
@@ -418,7 +410,6 @@ def maintenance_page():
                     st.success("✅ Resultados exportados a 'mantenimientos_exportados.xlsx'")
             
             with col_exp2:
-                # Exportar historial por vehículo si se filtró por uno específico
                 if selected_vehicle_id and selected_vehicle_display != "(Todos)":
                     vehicle_plate = selected_vehicle_display.split(" - ")[0]
                     if st.button(f"📎 Exportar historial de {vehicle_plate}", use_container_width=True):
@@ -442,20 +433,18 @@ def maintenance_page():
                     st.info("ℹ️ Selecciona un vehículo específico para exportar su historial")
             
             with col_exp3:
-                # Exportar resumen estadístico
                 if st.button("📊 Exportar resumen estadístico", use_container_width=True):
-                    # Crear resumen por tipo de mantenimiento
                     resumen_tipo = df_filtered.groupby('TIPO').size().reset_index(name='CANTIDAD')
                     resumen_estado = df_filtered.groupby('ESTADO').size().reset_index(name='CANTIDAD')
                     
                     with pd.ExcelWriter("resumen_mantenimientos.xlsx") as writer:
-                        df_full.to_excel(writer, sheet_name='Detalle', index=False)
+                        df_filtered.to_excel(writer, sheet_name='Detalle', index=False)
                         resumen_tipo.to_excel(writer, sheet_name='Resumen por Tipo', index=False)
                         resumen_estado.to_excel(writer, sheet_name='Resumen por Estado', index=False)
                     
                     st.success("✅ Resumen exportado a 'resumen_mantenimientos.xlsx'")
             
-            # Ver detalles de un mantenimiento específico
+            # Ver detalles
             st.markdown("---")
             st.subheader("🔍 Ver detalles completos")
             
@@ -486,12 +475,11 @@ def maintenance_page():
         else:
             st.warning("⚠️ No hay mantenimientos que coincidan con los filtros seleccionados")
             
-            # Sugerencia para limpiar filtros
             if filtros_activos:
                 st.info("💡 **Sugerencia:** Prueba quitando algunos filtros para ampliar la búsqueda")
     
     # ==================================================
-    # TAB 4: EDITAR/ELIMINAR MANTENIMIENTO
+    # TAB 4: EDITAR/ELIMINAR
     # ==================================================
     with tab4:
         st.subheader("✏️ Editar/Eliminar Mantenimiento")
