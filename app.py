@@ -29,25 +29,26 @@ except Exception as e:
 # Menú lateral
 st.sidebar.title("🚛 Fleet App")
 
+# app.py - Menú corregido
+
 menu = st.sidebar.radio(
     "Menú",
     [
-        "Importar Excel",
+        "Mantenimientos",
         "Vehículos",
         "Trailers",
         "Conductores",
-        "Mantenimientos"
+        "Importar Excel"
     ]
 )
 
-# Navegación
-if menu == "Importar Excel":
-    import_page()
+if menu == "Mantenimientos":
+    maintenance_page()
 elif menu == "Vehículos":
     vehicles_page()
 elif menu == "Trailers":
     trailers_page()
 elif menu == "Conductores":
     drivers_page()
-elif menu == "Mantenimientos":
-    maintenance_page()
+elif menu == "Importar Excel":
+    import_page()
