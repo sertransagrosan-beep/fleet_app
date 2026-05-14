@@ -1,9 +1,11 @@
-# modules/maintenance.py - VERSIÓN COMPLETA CON EXPORTACIÓN A EXCEL CORREGIDA
+# modules/maintenance.py - VERSIÓN CORREGIDA (sin alertas)
 
 import streamlit as st
 import pandas as pd
 from datetime import date
 import io
+from openpyxl import load_workbook
+from openpyxl.styles import Alignment
 
 from database.db import SessionLocal
 from database.models import Maintenance, Vehicle, Trailer, Driver
@@ -41,7 +43,7 @@ def exportar_a_excel(data, nombre_archivo, sheet_name="Datos"):
             adjusted_width = min(max_length + 2, 50)
             worksheet.column_dimensions[column_letter].width = adjusted_width
         
-        # Permitir texto envuelto
+        # Permitir texto envuelto en celdas largas
         for row in worksheet.iter_rows():
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical='top')
@@ -338,7 +340,7 @@ def maintenance_page():
             st.warning("⚠️ No hay mantenimientos que coincidan con los filtros seleccionados")
     
     # ==================================================
-    # TAB 3: REGISTRAR (con limpieza automática)
+    # TAB 3: REGISTRAR
     # ==================================================
     with tab3:
         st.subheader("Registrar Mantenimiento")
@@ -400,8 +402,7 @@ def maintenance_page():
                                            index=default_trailer_index)
             
             with col2:
-                default_driver_id = None
-                if vehicle_selected and vehicle_selected.conductor_habitual_id:
+                default_driver_id = None                if vehicle_selected and vehicle_selected.conductor_habitual_id:
                     default_driver_id = vehicle_selected.conductor_habitual_id
                 
                 drivers = db.query(Driver).filter(Driver.estado == "Activo").order_by(Driver.nombre).all()
@@ -514,19 +515,6 @@ def maintenance_page():
                                                            index=list(trailer_options_edit.keys()).index(maintenance.trailer_id) if maintenance.trailer_id in trailer_options_edit else 0)
                             
                             edit_fecha = st.date_input("Fecha", value=maintenance.fecha_ingreso)
-                            
-                            if maintenance.vehicle:
-                                st.divider()
-                                st.subheader("⚠️ Alertas")
-                                hoy = date.today()
-                                if maintenance.vehicle.soat:
-                                    dias_soat = (maintenance.vehicle.soat - hoy).days
-                                    if dias_soat < 0:
-                                        st.error(f"❌ SOAT vencido hace {abs(dias_soat)} días")
-                                    elif dias_soat < 30:
-                                        st.warning(f"⚠️ SOAT vence en {dias_soat} días")
-                                    else:
-                                        st.success(f"✅ SOAT vigente")
                         
                         with col2:
                             drivers = db.query(Driver).filter(Driver.estado == "Activo").all()
