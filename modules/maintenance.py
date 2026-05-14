@@ -1,10 +1,9 @@
-# modules/maintenance.py - VERSIÓN CORREGIDA (sin alertas)
+# modules/maintenance.py - VERSIÓN CORREGIDA (sin errores de sintaxis)
 
 import streamlit as st
 import pandas as pd
 from datetime import date
 import io
-from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 
 from database.db import SessionLocal
@@ -294,7 +293,7 @@ def maintenance_page():
                             })
                         exportar_a_excel(data_full, f"historial_{vehicle_plate}", f"Historial {vehicle_plate}")
                 else:
-                    st.info("ℹ️ Selecciona un vehículo específico")
+                    st.info("ℹ️ Selecciona un vehículo específico para exportar su historial")
             
             with col_exp3:
                 if st.button("📊 Exportar resumen estadístico a Excel", use_container_width=True):
@@ -402,7 +401,8 @@ def maintenance_page():
                                            index=default_trailer_index)
             
             with col2:
-                default_driver_id = None                if vehicle_selected and vehicle_selected.conductor_habitual_id:
+                default_driver_id = None
+                if vehicle_selected and vehicle_selected.conductor_habitual_id:
                     default_driver_id = vehicle_selected.conductor_habitual_id
                 
                 drivers = db.query(Driver).filter(Driver.estado == "Activo").order_by(Driver.nombre).all()
