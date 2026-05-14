@@ -12,10 +12,39 @@ def trailers_page():
     
     db = SessionLocal()
     
-    # Pestañas para organizar mejor
+    # NUEVO ORDEN: Listar, Registrar, Editar/Eliminar
     tab1, tab2, tab3 = st.tabs(["📋 Listar", "📝 Registrar", "✏️ Editar/Eliminar"])
     
+    # ==================================================
+    # TAB 1: LISTAR
+    # ==================================================
     with tab1:
+        st.subheader("Lista de Trailers")
+        
+        trailers = db.query(Trailer).order_by(Trailer.placa).all()
+        
+        if trailers:
+            data = []
+            for t in trailers:
+                data.append({
+                    "ID": t.id,
+                    "PLACA": t.placa,
+                    "MARCA": t.marca,
+                    "MODELO": t.modelo if t.modelo else "-",
+                    "CARROCERIA": t.carroceria if t.carroceria else "-",
+                    "EJES": t.numero_ejes,
+                    "ESTADO": t.estado
+                })
+            
+            df = pd.DataFrame(data)
+            st.dataframe(df, width="stretch", hide_index=True)
+        else:
+            st.info("No hay trailers registrados.")
+    
+    # ==================================================
+    # TAB 2: REGISTRAR
+    # ==================================================
+    with tab2:
         st.subheader("Registrar Trailer")
         
         with st.form("trailer_form"):
@@ -39,7 +68,6 @@ def trailers_page():
                 elif not marca:
                     st.error("La marca es obligatoria")
                 else:
-                    # Verificar si ya existe
                     existe = db.query(Trailer).filter(Trailer.placa == placa).first()
                     if existe:
                         st.error(f"Ya existe un trailer con placa {placa}")
@@ -57,36 +85,15 @@ def trailers_page():
                         st.success(f"Trailer {placa} registrado correctamente")
                         st.rerun()
     
-    with tab2:
-        st.subheader("Lista de Trailers")
-        
-        trailers = db.query(Trailer).order_by(Trailer.placa).all()
-        
-        if trailers:
-            data = []
-            for t in trailers:
-                data.append({
-                    "ID": t.id,
-                    "PLACA": t.placa,
-                    "MARCA": t.marca,
-                    "MODELO": t.modelo if t.modelo else "-",
-                    "CARROCERIA": t.carroceria if t.carroceria else "-",
-                    "EJES": t.numero_ejes,
-                    "ESTADO": t.estado
-                })
-            
-            df = pd.DataFrame(data)
-            st.dataframe(df, width="stretch", hide_index=True)
-        else:
-            st.info("No hay trailers registrados. Importa desde Excel o crea uno nuevo.")
-    
+    # ==================================================
+    # TAB 3: EDITAR/ELIMINAR
+    # ==================================================
     with tab3:
         st.subheader("Editar/Eliminar Trailer")
         
         trailers = db.query(Trailer).order_by(Trailer.placa).all()
         
         if trailers:
-            # Selector de trailer
             trailer_options = {t.id: f"{t.placa} - {t.marca}" for t in trailers}
             selected_id = st.selectbox("Seleccionar trailer", options=list(trailer_options.keys()),
                                         format_func=lambda x: trailer_options.get(x, ""))
@@ -99,7 +106,7 @@ def trailers_page():
                         col1, col2 = st.columns(2)
                         
                         with col1:
-                            edit_placa = st.text_input("Placa", value=trailer.placa, disabled=True)
+                            st.text_input("Placa", value=trailer.placa, disabled=True)
                             st.caption("La placa no se puede editar")
                             edit_marca = st.text_input("Marca", value=trailer.marca)
                             edit_modelo = st.text_input("Modelo", value=trailer.modelo if trailer.modelo else "")
