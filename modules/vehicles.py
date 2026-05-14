@@ -38,10 +38,10 @@ def vehicles_page():
                         soat_estado = f"⚠️ VENCIDO (hace {abs(dias_soat)} días)"
                         soat_color = "red"
                     elif dias_soat <= 30:
-                        soat_estado = f"⚠️ Vence en {dias_soat} días"
+                        soat_estado = f"⚠️ {dias_soat} días"
                         soat_color = "orange"
                     else:
-                        soat_estado = f"✅ Vigente (vence en {dias_soat} días)"
+                        soat_estado = f"✅ Restan ({dias_soat} días)"
                         soat_color = "green"
                 else:
                     soat_estado = "No registrado"
@@ -56,10 +56,10 @@ def vehicles_page():
                         tecno_estado = f"⚠️ VENCIDO (hace {abs(dias_tecno)} días)"
                         tecno_color = "red"
                     elif dias_tecno <= 30:
-                        tecno_estado = f"⚠️ Vence en {dias_tecno} días"
+                        tecno_estado = f"⚠️ {dias_tecno} días"
                         tecno_color = "orange"
                     else:
-                        tecno_estado = f"✅ Vigente (vence en {dias_tecno} días)"
+                        tecno_estado = f"✅ Restan ({dias_tecno} días)"
                         tecno_color = "green"
                 else:
                     tecno_estado = "No registrado"
@@ -93,7 +93,7 @@ def vehicles_page():
             # Mostrar leyenda de colores
             st.markdown("""
             **Leyenda de alertas:**
-            - 🟢 **Verde:** Vigente (más de 30 días para vencer)
+            - 🟢 **Verde:** Restan (más de 30 días para vencer)
             - 🟠 **Naranja:** Próximo a vencer (30 días o menos)
             - 🔴 **Rojo:** Vencido
             """)
@@ -249,18 +249,18 @@ def vehicles_page():
                             if dias_soat < 0:
                                 st.error(f"⚠️ SOAT VENCIDO hace {abs(dias_soat)} días")
                             elif dias_soat <= 30:
-                                st.warning(f"⚠️ SOAT vence en {dias_soat} días")
+                                st.warning(f"⚠️ SOAT {dias_soat} días")
                             else:
-                                st.success(f"✅ SOAT vigente (vence en {dias_soat} días)")
+                                st.success(f"✅ SOAT Restan ({dias_soat} días)")
                         
                         if vehicle.tecnomecanica:
                             dias_tecno = (vehicle.tecnomecanica - hoy).days
                             if dias_tecno < 0:
                                 st.error(f"⚠️ Tecnomecánica VENCIDA hace {abs(dias_tecno)} días")
                             elif dias_tecno <= 30:
-                                st.warning(f"⚠️ Tecnomecánica vence en {dias_tecno} días")
+                                st.warning(f"⚠️ Tecnomecánica {dias_tecno} días")
                             else:
-                                st.success(f"✅ Tecnomecánica vigente (vence en {dias_tecno} días)")
+                                st.success(f"✅ Tecnomecánica Restan ({dias_tecno} días)")
                         
                         col_btn1, col_btn2 = st.columns(2)
                         
