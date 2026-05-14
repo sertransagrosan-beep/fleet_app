@@ -89,14 +89,6 @@ def vehicles_page():
             
             # Mostrar tabla con colores condicionales usando st.markdown
             st.dataframe(df, width="stretch", hide_index=True)
-            
-            # Mostrar leyenda de colores
-            st.markdown("""
-            **Leyenda de alertas:**
-            - 🟢 **Verde:** Restan (más de 30 días para vencer)
-            - 🟠 **Naranja:** Próximo a vencer (30 días o menos)
-            - 🔴 **Rojo:** Vencido
-            """)
         else:
             st.info("No hay vehículos registrados.")
     
