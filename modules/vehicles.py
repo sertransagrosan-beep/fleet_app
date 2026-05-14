@@ -1,4 +1,4 @@
-# modules/vehicles.py
+# modules/vehicles.py - VERSIÓN CON ALERTAS DE VENCIMIENTO
 
 import streamlit as st
 import pandas as pd
@@ -13,11 +13,11 @@ def vehicles_page():
     
     db = SessionLocal()
     
-    # NUEVO ORDEN: Listar, Registrar, Editar/Eliminar
+    # Orden: Listar, Registrar, Editar/Eliminar
     tab1, tab2, tab3 = st.tabs(["📋 Listar", "📝 Registrar", "✏️ Editar/Eliminar"])
     
     # ==================================================
-    # TAB 1: LISTAR
+    # TAB 1: LISTAR (con alertas de vencimiento)
     # ==================================================
     with tab1:
         st.subheader("Lista de Vehículos")
@@ -25,8 +25,46 @@ def vehicles_page():
         vehicles = db.query(Vehicle).order_by(Vehicle.placa).all()
         
         if vehicles:
+            hoy = date.today()
             data = []
+            
             for v in vehicles:
+                # Calcular estado de SOAT
+                soat_estado = ""
+                soat_color = ""
+                if v.soat:
+                    dias_soat = (v.soat - hoy).days
+                    if dias_soat < 0:
+                        soat_estado = f"⚠️ VENCIDO (hace {abs(dias_soat)} días)"
+                        soat_color = "red"
+                    elif dias_soat <= 30:
+                        soat_estado = f"⚠️ Vence en {dias_soat} días"
+                        soat_color = "orange"
+                    else:
+                        soat_estado = f"✅ Vigente (vence en {dias_soat} días)"
+                        soat_color = "green"
+                else:
+                    soat_estado = "No registrado"
+                    soat_color = "gray"
+                
+                # Calcular estado de Tecnomecánica
+                tecno_estado = ""
+                tecno_color = ""
+                if v.tecnomecanica:
+                    dias_tecno = (v.tecnomecanica - hoy).days
+                    if dias_tecno < 0:
+                        tecno_estado = f"⚠️ VENCIDO (hace {abs(dias_tecno)} días)"
+                        tecno_color = "red"
+                    elif dias_tecno <= 30:
+                        tecno_estado = f"⚠️ Vence en {dias_tecno} días"
+                        tecno_color = "orange"
+                    else:
+                        tecno_estado = f"✅ Vigente (vence en {dias_tecno} días)"
+                        tecno_color = "green"
+                else:
+                    tecno_estado = "No registrado"
+                    tecno_color = "gray"
+                
                 trailer_habitual = v.trailer_habitual.placa if v.trailer_habitual else "-"
                 conductor_habitual = v.conductor_habitual.nombre if v.conductor_habitual else "-"
                 
@@ -38,7 +76,9 @@ def vehicles_page():
                     "MODELO": v.modelo if v.modelo else "-",
                     "COLOR": v.color if v.color else "-",
                     "SOAT": v.soat.strftime("%Y-%m-%d") if v.soat else "-",
+                    "SOAT_ESTADO": soat_estado,
                     "TECNOMECANICA": v.tecnomecanica.strftime("%Y-%m-%d") if v.tecnomecanica else "-",
+                    "TECNOMECANICA_ESTADO": tecno_estado,
                     "KILOMETRAJE": v.kilometraje_actual,
                     "TRAILER HABITUAL": trailer_habitual,
                     "CONDUCTOR HABITUAL": conductor_habitual,
@@ -46,7 +86,17 @@ def vehicles_page():
                 })
             
             df = pd.DataFrame(data)
+            
+            # Mostrar tabla con colores condicionales usando st.markdown
             st.dataframe(df, width="stretch", hide_index=True)
+            
+            # Mostrar leyenda de colores
+            st.markdown("""
+            **Leyenda de alertas:**
+            - 🟢 **Verde:** Vigente (más de 30 días para vencer)
+            - 🟠 **Naranja:** Próximo a vencer (30 días o menos)
+            - 🔴 **Rojo:** Vencido
+            """)
         else:
             st.info("No hay vehículos registrados.")
     
@@ -191,6 +241,26 @@ def vehicles_page():
                         
                         edit_estado = st.selectbox("Estado", ["Activo", "Mantenimiento", "Inactivo"],
                                                    index=["Activo", "Mantenimiento", "Inactivo"].index(vehicle.estado) if vehicle.estado in ["Activo", "Mantenimiento", "Inactivo"] else 0)
+                        
+                        # Mostrar alertas en edición
+                        hoy = date.today()
+                        if vehicle.soat:
+                            dias_soat = (vehicle.soat - hoy).days
+                            if dias_soat < 0:
+                                st.error(f"⚠️ SOAT VENCIDO hace {abs(dias_soat)} días")
+                            elif dias_soat <= 30:
+                                st.warning(f"⚠️ SOAT vence en {dias_soat} días")
+                            else:
+                                st.success(f"✅ SOAT vigente (vence en {dias_soat} días)")
+                        
+                        if vehicle.tecnomecanica:
+                            dias_tecno = (vehicle.tecnomecanica - hoy).days
+                            if dias_tecno < 0:
+                                st.error(f"⚠️ Tecnomecánica VENCIDA hace {abs(dias_tecno)} días")
+                            elif dias_tecno <= 30:
+                                st.warning(f"⚠️ Tecnomecánica vence en {dias_tecno} días")
+                            else:
+                                st.success(f"✅ Tecnomecánica vigente (vence en {dias_tecno} días)")
                         
                         col_btn1, col_btn2 = st.columns(2)
                         
