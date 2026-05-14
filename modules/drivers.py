@@ -14,7 +14,7 @@ def drivers_page():
     db = SessionLocal()
     
     # Pestañas para organizar mejor
-    tab1, tab2, tab3 = st.tabs(["📝 Registrar", "📋 Listar", "✏️ Editar/Eliminar"])
+    tab1, tab2, tab3 = st.tabs(["📋 Listar", "📝 Registrar", "✏️ Editar/Eliminar"])
     
     with tab1:
         st.subheader("Registrar Conductor")
