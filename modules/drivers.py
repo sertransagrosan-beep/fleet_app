@@ -13,10 +13,38 @@ def drivers_page():
     
     db = SessionLocal()
     
-    # Pestañas para organizar mejor
+    # NUEVO ORDEN: Listar, Registrar, Editar/Eliminar
     tab1, tab2, tab3 = st.tabs(["📋 Listar", "📝 Registrar", "✏️ Editar/Eliminar"])
     
+    # ==================================================
+    # TAB 1: LISTAR
+    # ==================================================
     with tab1:
+        st.subheader("Lista de Conductores")
+        
+        drivers = db.query(Driver).order_by(Driver.nombre).all()
+        
+        if drivers:
+            data = []
+            for d in drivers:
+                data.append({
+                    "ID": d.id,
+                    "NOMBRE": d.nombre,
+                    "IDENTIFICACION": d.identificacion,
+                    "TELEFONO": d.telefono if d.telefono else "-",
+                    "VENCIMIENTO LICENCIA": d.vencimiento_licencia.strftime("%Y-%m-%d") if d.vencimiento_licencia else "-",
+                    "ESTADO": d.estado
+                })
+            
+            df = pd.DataFrame(data)
+            st.dataframe(df, width="stretch", hide_index=True)
+        else:
+            st.info("No hay conductores registrados.")
+    
+    # ==================================================
+    # TAB 2: REGISTRAR
+    # ==================================================
+    with tab2:
         st.subheader("Registrar Conductor")
         
         with st.form("driver_form"):
@@ -39,7 +67,6 @@ def drivers_page():
                 elif not identificacion:
                     st.error("La identificación es obligatoria")
                 else:
-                    # Verificar si ya existe
                     existe = db.query(Driver).filter(Driver.identificacion == identificacion).first()
                     if existe:
                         st.error(f"Ya existe un conductor con identificación {identificacion}")
@@ -56,35 +83,15 @@ def drivers_page():
                         st.success(f"Conductor {nombre} registrado correctamente")
                         st.rerun()
     
-    with tab2:
-        st.subheader("Lista de Conductores")
-        
-        drivers = db.query(Driver).order_by(Driver.nombre).all()
-        
-        if drivers:
-            data = []
-            for d in drivers:
-                data.append({
-                    "ID": d.id,
-                    "NOMBRE": d.nombre,
-                    "IDENTIFICACION": d.identificacion,
-                    "TELEFONO": d.telefono if d.telefono else "-",
-                    "VENCIMIENTO LICENCIA": d.vencimiento_licencia.strftime("%Y-%m-%d") if d.vencimiento_licencia else "-",
-                    "ESTADO": d.estado
-                })
-            
-            df = pd.DataFrame(data)
-            st.dataframe(df, width="stretch", hide_index=True)
-        else:
-            st.info("No hay conductores registrados. Importa desde Excel o crea uno nuevo.")
-    
+    # ==================================================
+    # TAB 3: EDITAR/ELIMINAR
+    # ==================================================
     with tab3:
         st.subheader("Editar/Eliminar Conductor")
         
         drivers = db.query(Driver).order_by(Driver.nombre).all()
         
         if drivers:
-            # Selector de conductor
             driver_options = {d.id: f"{d.nombre} - {d.identificacion}" for d in drivers}
             selected_id = st.selectbox("Seleccionar conductor", options=list(driver_options.keys()),
                                         format_func=lambda x: driver_options.get(x, ""))
@@ -98,7 +105,7 @@ def drivers_page():
                         
                         with col1:
                             edit_nombre = st.text_input("Nombre completo", value=driver.nombre)
-                            edit_identificacion = st.text_input("Identificación", value=driver.identificacion, disabled=True)
+                            st.text_input("Identificación", value=driver.identificacion, disabled=True)
                             st.caption("La identificación no se puede editar")
                         
                         with col2:
