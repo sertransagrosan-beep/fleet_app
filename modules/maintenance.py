@@ -1,4 +1,4 @@
-# modules/maintenance.py
+# modules/maintenance.py - VERSIÓN COMPLETA CON EXPORTACIÓN A EXCEL CORREGIDA
 
 import streamlit as st
 import pandas as pd
@@ -7,6 +7,54 @@ import io
 
 from database.db import SessionLocal
 from database.models import Maintenance, Vehicle, Trailer, Driver
+
+
+# ==================================================
+# FUNCIÓN AUXILIAR PARA EXPORTAR A EXCEL
+# ==================================================
+
+def exportar_a_excel(data, nombre_archivo, sheet_name="Datos"):
+    """
+    Exporta datos a Excel manejando correctamente caracteres especiales,
+    saltos de línea y comillas.
+    """
+    df = pd.DataFrame(data)
+    df = df.fillna("")
+    
+    output = io.BytesIO()
+    
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
+        
+        worksheet = writer.sheets[sheet_name]
+        
+        # Ajustar ancho de columnas
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        # Permitir texto envuelto
+        for row in worksheet.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(wrap_text=True, vertical='top')
+    
+    output.seek(0)
+    
+    return st.download_button(
+        label="📥 Descargar Excel",
+        data=output,
+        file_name=f"{nombre_archivo}_{date.today()}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
 
 
 def maintenance_page():
@@ -22,7 +70,7 @@ def maintenance_page():
     if "edit_maintenance_id" not in st.session_state:
         st.session_state.edit_maintenance_id = None
     
-    # NUEVO ORDEN: Listar, Consultar, Registrar, Editar/Eliminar
+    # Orden: Listar, Consultar, Registrar, Editar/Eliminar
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Listar", "🔍 Consultar", "📝 Registrar", "✏️ Editar/Eliminar"])
     
     # ==================================================
@@ -51,37 +99,28 @@ def maintenance_page():
             df = pd.DataFrame(data)
             st.dataframe(df, width="stretch", hide_index=True)
             
-            # Botón de descarga
-            if st.button("📥 Descargar lista completa (CSV)", use_container_width=True):
+            # Exportar
+            if st.button("📊 Exportar lista completa a Excel", use_container_width=True):
                 data_full = []
                 for m in maintenances:
                     data_full.append({
                         "ID": m.id,
-                        "FECHA": m.fecha_ingreso.strftime("%Y-%m-%d") if m.fecha_ingreso else "-",
-                        "VEHÍCULO": m.vehicle.placa if m.vehicle else "-",
-                        "TRAILER": m.trailer.placa if m.trailer else "-",
-                        "CONDUCTOR": m.driver.nombre if m.driver else "-",
-                        "TIPO": m.tipo_mantenimiento,
-                        "TALLER": m.taller if m.taller else "-",
-                        "DESCRIPCIÓN": m.descripcion if m.descripcion else "-",
-                        "OBSERVACIONES": m.observaciones if m.observaciones else "-",
-                        "ESTADO": m.estado
+                        "FECHA": m.fecha_ingreso.strftime("%Y-%m-%d") if m.fecha_ingreso else "",
+                        "VEHÍCULO": m.vehicle.placa if m.vehicle else "",
+                        "TRAILER": m.trailer.placa if m.trailer else "",
+                        "CONDUCTOR": m.driver.nombre if m.driver else "",
+                        "TIPO": m.tipo_mantenimiento if m.tipo_mantenimiento else "",
+                        "TALLER": m.taller if m.taller else "",
+                        "DESCRIPCIÓN": m.descripcion if m.descripcion else "",
+                        "OBSERVACIONES": m.observaciones if m.observaciones else "",
+                        "ESTADO": m.estado if m.estado else ""
                     })
-                df_full = pd.DataFrame(data_full)
-                csv = df_full.to_csv(index=False).encode('utf-8')
-                
-                st.download_button(
-                    label="📥 Descargar CSV",
-                    data=csv,
-                    file_name=f"mantenimientos_completo_{date.today()}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
+                exportar_a_excel(data_full, "mantenimientos_completo", "Lista General")
         else:
             st.info("ℹ️ No hay mantenimientos registrados")
     
     # ==================================================
-    # TAB 2: CONSULTAR (con edición desde cada fila)
+    # TAB 2: CONSULTAR
     # ==================================================
     with tab2:
         st.subheader("🔍 Consulta de Mantenimientos")
@@ -151,7 +190,7 @@ def maintenance_page():
         if maintenances_filtered:
             st.success(f"📊 **{len(maintenances_filtered)}** mantenimiento(s) encontrado(s)")
             
-            # Mostrar resultados con botón de edición por fila
+            # Mostrar resultados con botón de edición
             for m in maintenances_filtered:
                 with st.container():
                     col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 1])
@@ -172,7 +211,7 @@ def maintenance_page():
                             st.rerun()
                     st.divider()
             
-            # Formulario de edición (aparece cuando se hace clic en Editar)
+            # Formulario de edición rápida
             if st.session_state.show_edit_form and st.session_state.edit_maintenance_id:
                 m = db.query(Maintenance).filter(Maintenance.id == st.session_state.edit_maintenance_id).first()
                 if m:
@@ -210,91 +249,90 @@ def maintenance_page():
                                 st.session_state.show_edit_form = False
                                 st.rerun()
             
-            # Botones de descarga
+            # Botones de exportación
             st.markdown("---")
-            st.subheader("📥 Exportar resultados")
+            st.subheader("📊 Exportar resultados")
             
             col_exp1, col_exp2, col_exp3 = st.columns(3)
             
             with col_exp1:
-                if st.button("📥 Descargar resultados (CSV)", use_container_width=True):
+                if st.button("📊 Exportar resultados a Excel", use_container_width=True):
                     data_full = []
                     for m in maintenances_filtered:
                         data_full.append({
                             "ID": m.id,
-                            "FECHA": m.fecha_ingreso.strftime("%Y-%m-%d") if m.fecha_ingreso else "-",
-                            "VEHÍCULO": m.vehicle.placa if m.vehicle else "-",
-                            "TRAILER": m.trailer.placa if m.trailer else "-",
-                            "CONDUCTOR": m.driver.nombre if m.driver else "-",
-                            "TIPO": m.tipo_mantenimiento,
-                            "TALLER": m.taller if m.taller else "-",
-                            "DESCRIPCIÓN": m.descripcion if m.descripcion else "-",
-                            "OBSERVACIONES": m.observaciones if m.observaciones else "-",
-                            "ESTADO": m.estado
+                            "FECHA": m.fecha_ingreso.strftime("%Y-%m-%d") if m.fecha_ingreso else "",
+                            "VEHÍCULO": m.vehicle.placa if m.vehicle else "",
+                            "TRAILER": m.trailer.placa if m.trailer else "",
+                            "CONDUCTOR": m.driver.nombre if m.driver else "",
+                            "TIPO": m.tipo_mantenimiento if m.tipo_mantenimiento else "",
+                            "TALLER": m.taller if m.taller else "",
+                            "DESCRIPCIÓN": m.descripcion if m.descripcion else "",
+                            "OBSERVACIONES": m.observaciones if m.observaciones else "",
+                            "ESTADO": m.estado if m.estado else ""
                         })
-                    df_full = pd.DataFrame(data_full)
-                    csv = df_full.to_csv(index=False).encode('utf-8')
-                    
-                    st.download_button(
-                        label="📥 Descargar CSV",
-                        data=csv,
-                        file_name=f"resultados_{date.today()}.csv",
-                        mime="text/csv"
-                    )
+                    exportar_a_excel(data_full, "resultados", "Resultados")
             
             with col_exp2:
                 if selected_vehicle_id and selected_vehicle_display != "(Todos)":
                     vehicle_plate = selected_vehicle_display.split(" - ")[0]
-                    if st.button(f"📥 Descargar historial de {vehicle_plate}", use_container_width=True):
+                    if st.button(f"📊 Exportar historial de {vehicle_plate} a Excel", use_container_width=True):
                         data_full = []
                         for m in maintenances_filtered:
                             data_full.append({
                                 "ID": m.id,
-                                "FECHA": m.fecha_ingreso.strftime("%Y-%m-%d") if m.fecha_ingreso else "-",
-                                "TRAILER": m.trailer.placa if m.trailer else "-",
-                                "CONDUCTOR": m.driver.nombre if m.driver else "-",
-                                "TIPO": m.tipo_mantenimiento,
-                                "TALLER": m.taller if m.taller else "-",
-                                "DESCRIPCIÓN": m.descripcion if m.descripcion else "-",
-                                "OBSERVACIONES": m.observaciones if m.observaciones else "-",
-                                "ESTADO": m.estado
+                                "FECHA": m.fecha_ingreso.strftime("%Y-%m-%d") if m.fecha_ingreso else "",
+                                "TRAILER": m.trailer.placa if m.trailer else "",
+                                "CONDUCTOR": m.driver.nombre if m.driver else "",
+                                "TIPO": m.tipo_mantenimiento if m.tipo_mantenimiento else "",
+                                "TALLER": m.taller if m.taller else "",
+                                "DESCRIPCIÓN": m.descripcion if m.descripcion else "",
+                                "OBSERVACIONES": m.observaciones if m.observaciones else "",
+                                "ESTADO": m.estado if m.estado else ""
                             })
-                        df_historial = pd.DataFrame(data_full)
-                        csv = df_historial.to_csv(index=False).encode('utf-8')
-                        
-                        st.download_button(
-                            label="📥 Descargar CSV",
-                            data=csv,
-                            file_name=f"historial_{vehicle_plate}_{date.today()}.csv",
-                            mime="text/csv"
-                        )
+                        exportar_a_excel(data_full, f"historial_{vehicle_plate}", f"Historial {vehicle_plate}")
                 else:
-                    st.info("ℹ️ Selecciona un vehículo específico para exportar su historial")
+                    st.info("ℹ️ Selecciona un vehículo específico")
             
             with col_exp3:
-                if st.button("📥 Descargar resumen estadístico", use_container_width=True):
-                    # Usar df_filtered de los datos mostrados
-                    data_for_resumen = []
+                if st.button("📊 Exportar resumen estadístico a Excel", use_container_width=True):
+                    resumen_tipo = {}
+                    resumen_estado = {}
                     for m in maintenances_filtered:
-                        data_for_resumen.append({
-                            "TIPO": m.tipo_mantenimiento,
-                            "ESTADO": m.estado
-                        })
-                    df_resumen = pd.DataFrame(data_for_resumen)
-                    resumen_tipo = df_resumen.groupby('TIPO').size().reset_index(name='CANTIDAD')
-                    resumen_estado = df_resumen.groupby('ESTADO').size().reset_index(name='CANTIDAD')
+                        tipo = m.tipo_mantenimiento if m.tipo_mantenimiento else "Sin especificar"
+                        estado = m.estado if m.estado else "Sin especificar"
+                        resumen_tipo[tipo] = resumen_tipo.get(tipo, 0) + 1
+                        resumen_estado[estado] = resumen_estado.get(estado, 0) + 1
                     
-                    output = io.StringIO()
-                    output.write("=== RESUMEN POR TIPO ===\n")
-                    resumen_tipo.to_csv(output, index=False)
-                    output.write("\n=== RESUMEN POR ESTADO ===\n")
-                    resumen_estado.to_csv(output, index=False)
+                    df_tipo = pd.DataFrame(resumen_tipo.items(), columns=["TIPO", "CANTIDAD"])
+                    df_estado = pd.DataFrame(resumen_estado.items(), columns=["ESTADO", "CANTIDAD"])
                     
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        df_tipo.to_excel(writer, sheet_name="Resumen por Tipo", index=False)
+                        df_estado.to_excel(writer, sheet_name="Resumen por Estado", index=False)
+                        
+                        for sheet_name in writer.sheets:
+                            worksheet = writer.sheets[sheet_name]
+                            for column in worksheet.columns:
+                                max_length = 0
+                                column_letter = column[0].column_letter
+                                for cell in column:
+                                    try:
+                                        if len(str(cell.value)) > max_length:
+                                            max_length = len(str(cell.value))
+                                    except:
+                                        pass
+                                adjusted_width = min(max_length + 2, 30)
+                                worksheet.column_dimensions[column_letter].width = adjusted_width
+                    
+                    output.seek(0)
                     st.download_button(
-                        label="📥 Descargar CSV",
-                        data=output.getvalue().encode('utf-8'),
-                        file_name=f"resumen_mantenimientos_{date.today()}.csv",
-                        mime="text/csv"
+                        label="📥 Descargar Excel",
+                        data=output,
+                        file_name=f"resumen_mantenimientos_{date.today()}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
                     )
         else:
             st.warning("⚠️ No hay mantenimientos que coincidan con los filtros seleccionados")
@@ -314,7 +352,6 @@ def maintenance_page():
         
         vehicle_options = {v.id: f"{v.placa} - {v.marca} {v.linea}" for v in vehicles}
         
-        # Resetear selección después de guardar
         if st.session_state.maintenance_form_submitted:
             st.session_state.selected_vehicle_id = list(vehicle_options.keys())[0] if vehicle_options else None
             st.session_state.maintenance_form_submitted = False
