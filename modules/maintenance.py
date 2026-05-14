@@ -1,4 +1,6 @@
-# modules/maintenance.py - VERSIÓN CORREGIDA (sin errores de sintaxis)
+# modules/maintenance.py - VERSIÓN COMPLETA CORREGIDA
+# - Eliminados SOAT y Tecnomecánica del Tipo de mantenimiento
+# - Agregado filtro de búsqueda por Observaciones
 
 import streamlit as st
 import pandas as pd
@@ -129,7 +131,7 @@ def maintenance_page():
         st.markdown("---")
         st.markdown("### 🎯 Filtros de búsqueda (todos son opcionales)")
         
-        # Filtros
+        # Filtros - Primera fila
         col_f1, col_f2 = st.columns(2)
         
         with col_f1:
@@ -146,45 +148,72 @@ def maintenance_page():
             selected_trailer_id = trailer_map.get(selected_trailer_display) if selected_trailer_display != "(Todos)" else None
         
         with col_f2:
-            tipo_list = ["(Todos)", "Preventivo", "Correctivo", "Predictivo", "SOAT", "Tecnomecánica", "Urgente"]
+            # Tipo de mantenimiento - SIN SOAT ni Tecnomecánica
+            tipo_list = ["(Todos)", "Preventivo", "Correctivo", "Predictivo", "Urgente"]
             selected_tipo = st.selectbox("🔧 Tipo de mantenimiento", options=tipo_list, index=0)
             
             estado_list = ["(Todos)", "Pendiente", "En curso", "Completado", "Cancelado"]
             selected_estado = st.selectbox("📊 Estado", options=estado_list, index=0)
         
-        col_f3, col_f4 = st.columns(2)
+        # Filtros - Segunda fila (3 columnas)
+        col_f3, col_f4, col_f5 = st.columns(3)
+        
         with col_f3:
             taller_search = st.text_input("🔍 Buscar taller", placeholder="Texto...")
+        
         with col_f4:
             descripcion_search = st.text_input("📝 Buscar en descripción", placeholder="Texto...")
         
-        col_f5, col_f6 = st.columns(2)
         with col_f5:
-            fecha_desde = st.date_input("📅 Fecha desde", value=None)
+            observaciones_search = st.text_input("💬 Buscar en observaciones", placeholder="Texto...")
+        
+        # Filtros - Tercera fila (Fechas)
+        col_f6, col_f7 = st.columns(2)
+        
         with col_f6:
+            fecha_desde = st.date_input("📅 Fecha desde", value=None)
+        with col_f7:
             fecha_hasta = st.date_input("📅 Fecha hasta", value=None)
         
         st.markdown("---")
         
         # Construir consulta
         query = db.query(Maintenance)
+        filtros_activos = []
         
         if selected_vehicle_id:
             query = query.filter(Maintenance.vehiculo_id == selected_vehicle_id)
+            filtros_activos.append(f"Vehículo: {selected_vehicle_display}")
         if selected_trailer_id:
             query = query.filter(Maintenance.trailer_id == selected_trailer_id)
+            filtros_activos.append(f"Trailer: {selected_trailer_display}")
         if selected_tipo != "(Todos)":
             query = query.filter(Maintenance.tipo_mantenimiento == selected_tipo)
+            filtros_activos.append(f"Tipo: {selected_tipo}")
         if selected_estado != "(Todos)":
             query = query.filter(Maintenance.estado == selected_estado)
+            filtros_activos.append(f"Estado: {selected_estado}")
         if taller_search:
             query = query.filter(Maintenance.taller.ilike(f"%{taller_search}%"))
+            filtros_activos.append(f"Taller contiene: '{taller_search}'")
         if descripcion_search:
             query = query.filter(Maintenance.descripcion.ilike(f"%{descripcion_search}%"))
+            filtros_activos.append(f"Descripción contiene: '{descripcion_search}'")
+        if observaciones_search:
+            query = query.filter(Maintenance.observaciones.ilike(f"%{observaciones_search}%"))
+            filtros_activos.append(f"Observaciones contiene: '{observaciones_search}'")
         if fecha_desde:
             query = query.filter(Maintenance.fecha_ingreso >= fecha_desde)
+            filtros_activos.append(f"Desde: {fecha_desde}")
         if fecha_hasta:
             query = query.filter(Maintenance.fecha_ingreso <= fecha_hasta)
+            filtros_activos.append(f"Hasta: {fecha_hasta}")
+        
+        # Mostrar resumen de filtros activos
+        if filtros_activos:
+            st.info(f"🔍 **Filtros aplicados ({len(filtros_activos)}):** " + " | ".join(filtros_activos))
+        else:
+            st.info("🔍 **Mostrando todos los mantenimientos** (sin filtros aplicados)")
         
         maintenances_filtered = query.order_by(Maintenance.fecha_ingreso.desc()).all()
         
@@ -194,7 +223,7 @@ def maintenance_page():
             # Mostrar resultados con botón de edición
             for m in maintenances_filtered:
                 with st.container():
-                    col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 1])
+                    col1, col2, col3, col4, col5, col6, col7 = st.columns([2, 2, 1, 2, 1, 1, 1])
                     with col1:
                         st.write(f"**{m.fecha_ingreso}**")
                     with col2:
@@ -206,6 +235,9 @@ def maintenance_page():
                     with col5:
                         st.write(f"{m.estado}")
                     with col6:
+                        desc_preview = (m.descripcion[:30] + "...") if m.descripcion and len(m.descripcion) > 30 else (m.descripcion if m.descripcion else "-")
+                        st.write(f"{desc_preview}")
+                    with col7:
                         if st.button(f"✏️ Editar", key=f"edit_{m.id}"):
                             st.session_state.show_edit_form = True
                             st.session_state.edit_maintenance_id = m.id
@@ -224,14 +256,21 @@ def maintenance_page():
                         
                         with col_edit1:
                             edit_fecha = st.date_input("Fecha", value=m.fecha_ingreso)
-                            edit_tipo = st.selectbox("Tipo", ["Preventivo", "Correctivo", "Predictivo", "SOAT", "Tecnomecánica", "Urgente"],
-                                                     index=["Preventivo", "Correctivo", "Predictivo", "SOAT", "Tecnomecánica", "Urgente"].index(m.tipo_mantenimiento))
-                            edit_estado = st.selectbox("Estado", ["Pendiente", "En curso", "Completado", "Cancelado"],
-                                                       index=["Pendiente", "En curso", "Completado", "Cancelado"].index(m.estado))
+                            edit_tipo = st.selectbox(
+                                "Tipo", 
+                                ["Preventivo", "Correctivo", "Predictivo", "Urgente"],
+                                index=["Preventivo", "Correctivo", "Predictivo", "Urgente"].index(m.tipo_mantenimiento) if m.tipo_mantenimiento in ["Preventivo", "Correctivo", "Predictivo", "Urgente"] else 0
+                            )
+                            edit_estado = st.selectbox(
+                                "Estado", 
+                                ["Pendiente", "En curso", "Completado", "Cancelado"],
+                                index=["Pendiente", "En curso", "Completado", "Cancelado"].index(m.estado) if m.estado in ["Pendiente", "En curso", "Completado", "Cancelado"] else 0
+                            )
                         
                         with col_edit2:
                             edit_taller = st.text_input("Taller", value=m.taller if m.taller else "")
-                            edit_descripcion = st.text_area("Descripción", value=m.descripcion if m.descripcion else "", height=100)
+                            edit_descripcion = st.text_area("📝 Descripción", value=m.descripcion if m.descripcion else "", height=100)
+                            edit_observaciones = st.text_area("💬 Observaciones", value=m.observaciones if m.observaciones else "", height=100)
                         
                         col_btn1, col_btn2 = st.columns(2)
                         with col_btn1:
@@ -241,6 +280,7 @@ def maintenance_page():
                                 m.estado = edit_estado
                                 m.taller = edit_taller
                                 m.descripcion = edit_descripcion
+                                m.observaciones = edit_observaciones
                                 db.commit()
                                 st.success("✅ Mantenimiento actualizado")
                                 st.session_state.show_edit_form = False
@@ -432,8 +472,9 @@ def maintenance_page():
             col3, col4 = st.columns(2)
             with col3:
                 fecha_ingreso = st.date_input("📅 Fecha de ingreso", value=date.today())
+                # Tipo de mantenimiento - SIN SOAT ni Tecnomecánica
                 tipo_mantenimiento = st.selectbox("🔧 Tipo de mantenimiento",
-                                                   ["Preventivo", "Correctivo", "Predictivo", "SOAT", "Tecnomecánica", "Urgente"])
+                                                   ["Preventivo", "Correctivo", "Predictivo", "Urgente"])
                 taller = st.text_input("🏪 Taller / Mecánico")
             with col4:
                 estado = st.selectbox("📊 Estado", ["Pendiente", "En curso", "Completado", "Cancelado"])
@@ -529,8 +570,9 @@ def maintenance_page():
                             edit_taller = st.text_input("Taller", value=maintenance.taller if maintenance.taller else "")
                             edit_estado = st.selectbox("Estado", ["Pendiente", "En curso", "Completado", "Cancelado"],
                                                        index=["Pendiente", "En curso", "Completado", "Cancelado"].index(maintenance.estado))
-                            edit_tipo = st.selectbox("Tipo", ["Preventivo", "Correctivo", "Predictivo", "SOAT", "Tecnomecánica", "Urgente"],
-                                                     index=["Preventivo", "Correctivo", "Predictivo", "SOAT", "Tecnomecánica", "Urgente"].index(maintenance.tipo_mantenimiento))
+                            # Tipo de mantenimiento - SIN SOAT ni Tecnomecánica
+                            edit_tipo = st.selectbox("Tipo", ["Preventivo", "Correctivo", "Predictivo", "Urgente"],
+                                                     index=["Preventivo", "Correctivo", "Predictivo", "Urgente"].index(maintenance.tipo_mantenimiento) if maintenance.tipo_mantenimiento in ["Preventivo", "Correctivo", "Predictivo", "Urgente"] else 0)
                         
                         edit_descripcion = st.text_area("Descripción", value=maintenance.descripcion if maintenance.descripcion else "", height=100)
                         edit_observaciones = st.text_area("Observaciones", value=maintenance.observaciones if maintenance.observaciones else "", height=100)
