@@ -2,7 +2,6 @@
 
 import streamlit as st
 
-# Importar desde la nueva configuración de base de datos
 from database.db import init_db, engine
 import database.models
 
@@ -19,17 +18,15 @@ st.set_page_config(
     layout="wide"
 )
 
-# Inicializar la base de datos (crear tablas si no existen)
+# Inicializar la base de datos
 try:
     init_db()
     st.sidebar.success("✅ Conectado a Neon PostgreSQL")
 except Exception as e:
     st.sidebar.error(f"❌ Error de conexión: {e}")
 
-# Menú lateral
+# Menú lateral - NUEVO ORDEN
 st.sidebar.title("🚛 Fleet App")
-
-# app.py - Menú corregido
 
 menu = st.sidebar.radio(
     "Menú",
@@ -42,6 +39,7 @@ menu = st.sidebar.radio(
     ]
 )
 
+# Navegación
 if menu == "Mantenimientos":
     maintenance_page()
 elif menu == "Vehículos":
