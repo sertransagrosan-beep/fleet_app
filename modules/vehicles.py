@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import date
 
 from database.db import SessionLocal
-from database.models import Vehicle, Trailer, Driver<
+from database.models import Vehicle, Trailer, Driver
 
 
 def vehicles_page():
@@ -41,7 +41,7 @@ def vehicles_page():
                         soat_estado = f"⚠️ Vence en {dias_soat} días"
                         soat_color = "orange"
                     else:
-                        soat_estado = f"✅ Restan: {dias_soat} días)"
+                        soat_estado = f"✅ Vigente (vence en {dias_soat} días)"
                         soat_color = "green"
                 else:
                     soat_estado = "No registrado"
@@ -59,7 +59,7 @@ def vehicles_page():
                         tecno_estado = f"⚠️ Vence en {dias_tecno} días"
                         tecno_color = "orange"
                     else:
-                        tecno_estado = f"✅ Restan: {dias_tecno} días)"
+                        tecno_estado = f"✅ Vigente (vence en {dias_tecno} días)"
                         tecno_color = "green"
                 else:
                     tecno_estado = "No registrado"
@@ -251,7 +251,7 @@ def vehicles_page():
                             elif dias_soat <= 30:
                                 st.warning(f"⚠️ SOAT vence en {dias_soat} días")
                             else:
-                                st.success(f"✅ SOAT Restan: {dias_soat} días")
+                                st.success(f"✅ SOAT vigente (vence en {dias_soat} días)")
                         
                         if vehicle.tecnomecanica:
                             dias_tecno = (vehicle.tecnomecanica - hoy).days
@@ -260,7 +260,7 @@ def vehicles_page():
                             elif dias_tecno <= 30:
                                 st.warning(f"⚠️ Tecnomecánica vence en {dias_tecno} días")
                             else:
-                                st.success(f"✅ Tecnomecánica Restan: {dias_tecno} días")
+                                st.success(f"✅ Tecnomecánica vigente (vence en {dias_tecno} días)")
                         
                         col_btn1, col_btn2 = st.columns(2)
                         
