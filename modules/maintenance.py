@@ -1,9 +1,9 @@
-# modules/maintenance.py - VERSIÓN COMPLETA CORREGIDA
+# modules/maintenance.py
 
 import streamlit as st
 import pandas as pd
 from datetime import date
-import os
+import io
 
 from database.db import SessionLocal
 from database.models import Maintenance, Vehicle, Trailer, Driver
@@ -26,7 +26,7 @@ def maintenance_page():
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Listar", "🔍 Consultar", "📝 Registrar", "✏️ Editar/Eliminar"])
     
     # ==================================================
-    # TAB 1: LISTAR (ahora es la primera)
+    # TAB 1: LISTAR
     # ==================================================
     with tab1:
         st.subheader("📋 Lista de Mantenimientos")
@@ -51,8 +51,8 @@ def maintenance_page():
             df = pd.DataFrame(data)
             st.dataframe(df, width="stretch", hide_index=True)
             
-            # Exportar
-            if st.button("📎 Exportar lista completa a Excel", use_container_width=True):
+            # Botón de descarga
+            if st.button("📥 Descargar lista completa (CSV)", use_container_width=True):
                 data_full = []
                 for m in maintenances:
                     data_full.append({
@@ -68,15 +68,20 @@ def maintenance_page():
                         "ESTADO": m.estado
                     })
                 df_full = pd.DataFrame(data_full)
-                # Guardar en la carpeta actual del usuario
-                filepath = os.path.join(os.getcwd(), "mantenimientos_completo.xlsx")
-                df_full.to_excel(filepath, index=False)
-                st.success(f"✅ Lista completa exportada a: {filepath}")
+                csv = df_full.to_csv(index=False).encode('utf-8')
+                
+                st.download_button(
+                    label="📥 Descargar CSV",
+                    data=csv,
+                    file_name=f"mantenimientos_completo_{date.today()}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
         else:
             st.info("ℹ️ No hay mantenimientos registrados")
     
     # ==================================================
-    # TAB 2: CONSULTAR (con botones para editar)
+    # TAB 2: CONSULTAR (con edición desde cada fila)
     # ==================================================
     with tab2:
         st.subheader("🔍 Consulta de Mantenimientos")
@@ -149,7 +154,7 @@ def maintenance_page():
             # Mostrar resultados con botón de edición por fila
             for m in maintenances_filtered:
                 with st.container():
-                    col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1])
+                    col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 1])
                     with col1:
                         st.write(f"**{m.fecha_ingreso}**")
                     with col2:
@@ -157,8 +162,10 @@ def maintenance_page():
                     with col3:
                         st.write(f"{m.tipo_mantenimiento}")
                     with col4:
-                        st.write(f"{m.estado}")
+                        st.write(f"{m.taller if m.taller else '-'}")
                     with col5:
+                        st.write(f"{m.estado}")
+                    with col6:
                         if st.button(f"✏️ Editar", key=f"edit_{m.id}"):
                             st.session_state.show_edit_form = True
                             st.session_state.edit_maintenance_id = m.id
@@ -202,8 +209,95 @@ def maintenance_page():
                             if st.form_submit_button("❌ Cancelar"):
                                 st.session_state.show_edit_form = False
                                 st.rerun()
+            
+            # Botones de descarga
+            st.markdown("---")
+            st.subheader("📥 Exportar resultados")
+            
+            col_exp1, col_exp2, col_exp3 = st.columns(3)
+            
+            with col_exp1:
+                if st.button("📥 Descargar resultados (CSV)", use_container_width=True):
+                    data_full = []
+                    for m in maintenances_filtered:
+                        data_full.append({
+                            "ID": m.id,
+                            "FECHA": m.fecha_ingreso.strftime("%Y-%m-%d") if m.fecha_ingreso else "-",
+                            "VEHÍCULO": m.vehicle.placa if m.vehicle else "-",
+                            "TRAILER": m.trailer.placa if m.trailer else "-",
+                            "CONDUCTOR": m.driver.nombre if m.driver else "-",
+                            "TIPO": m.tipo_mantenimiento,
+                            "TALLER": m.taller if m.taller else "-",
+                            "DESCRIPCIÓN": m.descripcion if m.descripcion else "-",
+                            "OBSERVACIONES": m.observaciones if m.observaciones else "-",
+                            "ESTADO": m.estado
+                        })
+                    df_full = pd.DataFrame(data_full)
+                    csv = df_full.to_csv(index=False).encode('utf-8')
+                    
+                    st.download_button(
+                        label="📥 Descargar CSV",
+                        data=csv,
+                        file_name=f"resultados_{date.today()}.csv",
+                        mime="text/csv"
+                    )
+            
+            with col_exp2:
+                if selected_vehicle_id and selected_vehicle_display != "(Todos)":
+                    vehicle_plate = selected_vehicle_display.split(" - ")[0]
+                    if st.button(f"📥 Descargar historial de {vehicle_plate}", use_container_width=True):
+                        data_full = []
+                        for m in maintenances_filtered:
+                            data_full.append({
+                                "ID": m.id,
+                                "FECHA": m.fecha_ingreso.strftime("%Y-%m-%d") if m.fecha_ingreso else "-",
+                                "TRAILER": m.trailer.placa if m.trailer else "-",
+                                "CONDUCTOR": m.driver.nombre if m.driver else "-",
+                                "TIPO": m.tipo_mantenimiento,
+                                "TALLER": m.taller if m.taller else "-",
+                                "DESCRIPCIÓN": m.descripcion if m.descripcion else "-",
+                                "OBSERVACIONES": m.observaciones if m.observaciones else "-",
+                                "ESTADO": m.estado
+                            })
+                        df_historial = pd.DataFrame(data_full)
+                        csv = df_historial.to_csv(index=False).encode('utf-8')
+                        
+                        st.download_button(
+                            label="📥 Descargar CSV",
+                            data=csv,
+                            file_name=f"historial_{vehicle_plate}_{date.today()}.csv",
+                            mime="text/csv"
+                        )
+                else:
+                    st.info("ℹ️ Selecciona un vehículo específico para exportar su historial")
+            
+            with col_exp3:
+                if st.button("📥 Descargar resumen estadístico", use_container_width=True):
+                    # Usar df_filtered de los datos mostrados
+                    data_for_resumen = []
+                    for m in maintenances_filtered:
+                        data_for_resumen.append({
+                            "TIPO": m.tipo_mantenimiento,
+                            "ESTADO": m.estado
+                        })
+                    df_resumen = pd.DataFrame(data_for_resumen)
+                    resumen_tipo = df_resumen.groupby('TIPO').size().reset_index(name='CANTIDAD')
+                    resumen_estado = df_resumen.groupby('ESTADO').size().reset_index(name='CANTIDAD')
+                    
+                    output = io.StringIO()
+                    output.write("=== RESUMEN POR TIPO ===\n")
+                    resumen_tipo.to_csv(output, index=False)
+                    output.write("\n=== RESUMEN POR ESTADO ===\n")
+                    resumen_estado.to_csv(output, index=False)
+                    
+                    st.download_button(
+                        label="📥 Descargar CSV",
+                        data=output.getvalue().encode('utf-8'),
+                        file_name=f"resumen_mantenimientos_{date.today()}.csv",
+                        mime="text/csv"
+                    )
         else:
-            st.warning("⚠️ No hay mantenimientos que coincidan")
+            st.warning("⚠️ No hay mantenimientos que coincidan con los filtros seleccionados")
     
     # ==================================================
     # TAB 3: REGISTRAR (con limpieza automática)
@@ -351,7 +445,7 @@ def maintenance_page():
                     st.rerun()
     
     # ==================================================
-    # TAB 4: EDITAR/ELIMINAR (se mantiene igual)
+    # TAB 4: EDITAR/ELIMINAR
     # ==================================================
     with tab4:
         st.subheader("✏️ Editar/Eliminar Mantenimiento")
